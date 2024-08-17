@@ -10,7 +10,7 @@ export default function TrackGroup({ trackNames, imagePrefix, buffers, activeInd
           className={`${activeIndex === index ? 'ring-2 ' : ''}`}
           onClick={() => toggleTrack(index)}
         >
-          <img src={`${imagePrefix}${index}.png`} alt={`track${index}`} className="h-10 w-10 object-contain" />
+          <img src={`${imagePrefix}${index}.png`} alt={`track${index}`} className="h-12 w-12 object-contain" />
         </Button>
       ))}
     </div>

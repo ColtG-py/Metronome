@@ -7,11 +7,11 @@ export default function Header() {
       <header className="fixed top-0 w-full py-4 flex items-center justify-center text-white text-2xl">
         <TypeAnimation 
             sequence={[
-                "mashbox",
+                "metronome",
                 3000,
-                "mashbox. click a button",
+                "metronome. click a button",
                 3000,
-                "mashbox"
+                "metronome"
             ]}
             repeat={0}
         />
