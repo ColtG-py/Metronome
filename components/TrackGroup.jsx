@@ -2,7 +2,7 @@ import { Button } from "@/components/ui/button";
 
 export default function TrackGroup({ trackNames, imagePrefix, buffers, activeIndex, toggleTrack }) {
   return (
-    <div className="flex flex-row items-center">
+    <div className="flex flex-row items-center space-x-4">
       {trackNames.map((_, index) => (
         <Button
           variant="ghost"
