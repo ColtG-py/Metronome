@@ -1,67 +1,56 @@
 'use client';
 
 import { useEffect, useState, useRef } from 'react';
-import { Progress } from "@/components/ui/progress";
 import Footer from "@/components/Footer";
 import Header from "@/components/Header";
 import TrackGroup from "@/components/TrackGroup";
 import { trackConfigs } from "@/config/trackConfig";
+import { Button } from "@/components/ui/button";
+
+
+const loadBuffers = async (audioContext, tracks) => {
+  const buffers = await Promise.all(
+    tracks.map(track => 
+      fetch(track)
+        .then(response => response.arrayBuffer())
+        .then(data => audioContext.decodeAudioData(data))
+    )
+  );
+  return buffers;
+};
 
 export default function Home() {
-  const scene = trackConfigs.scene_1; // Select the scene to use
+  const [selectedSceneIndex, setSelectedSceneIndex] = useState(0); // State to track selected scene
+  const sceneKeys = Object.keys(trackConfigs); // Get scene keys dynamically
+  const scene = trackConfigs[sceneKeys[selectedSceneIndex]]; // Select the current scene based on the index
 
   const [audioContext, setAudioContext] = useState(null);
-  const [nutmegBuffers, setNutmegBuffers] = useState([]);
-  const [pianoBuffers, setPianoBuffers] = useState([]);
-  const [violaBuffers, setViolaBuffers] = useState([]);
-  const [reeseBuffers, setReeseBuffers] = useState([]);
-  const [activeNutmegIndex, setActiveNutmegIndex] = useState(null);
-  const [activePianoIndex, setActivePianoIndex] = useState(null);
-  const [activeViolaIndex, setActiveViolaIndex] = useState(null);
-  const [activeReeseIndex, setActiveReeseIndex] = useState(null);
+  const [buffers, setBuffers] = useState({});
+  const [activeIndices, setActiveIndices] = useState({});
   const [nextBarTime, setNextBarTime] = useState(0);
   const [beat, setBeat] = useState(0);
 
   const beatIntervalRef = useRef();
   const sourcesRef = useRef({});
 
-  // Page load
   useEffect(() => {
     const context = new (window.AudioContext || window.webkitAudioContext)();
     setAudioContext(context);
 
-    Promise.all(
-      scene.nutmeg.tracks.map(track => 
-        fetch(track)
-          .then(response => response.arrayBuffer())
-          .then(data => context.decodeAudioData(data))
-      )
-    ).then(buffers => setNutmegBuffers(buffers));
+    const loadSceneBuffers = async () => {
+      const loadedBuffers = {};
 
-    Promise.all(
-      scene.piano.tracks.map(track => 
-        fetch(track)
-          .then(response => response.arrayBuffer())
-          .then(data => context.decodeAudioData(data))
-      )
-    ).then(buffers => setPianoBuffers(buffers));
+      for (const [trackType, trackData] of Object.entries(scene)) {
+        if (trackData.tracks) {
+          loadedBuffers[trackType] = await loadBuffers(context, trackData.tracks);
+        }
+      }
 
-    Promise.all(
-      scene.viola.tracks.map(track => 
-        fetch(track)
-          .then(response => response.arrayBuffer())
-          .then(data => context.decodeAudioData(data))
-      )
-    ).then(buffers => setViolaBuffers(buffers));
+      setBuffers(loadedBuffers);
+      setActiveIndices({}); // Reset active indices when the scene changes
+    };
 
-    Promise.all(
-      scene.reese.tracks.map(track => 
-        fetch(track)
-          .then(response => response.arrayBuffer())
-          .then(data => context.decodeAudioData(data))
-      )
-    ).then(buffers => setReeseBuffers(buffers));
-
+    loadSceneBuffers();
 
     return () => {
       clearInterval(beatIntervalRef.current);
@@ -74,7 +63,6 @@ export default function Home() {
   // Sync the metronome with the audio context's current time
   useEffect(() => {
     if (audioContext && !beatIntervalRef.current) {
-      // Initially set the next bar time
       setNextBarTime(audioContext.currentTime + (secondsPerBeat * beatsPerBar));
       beatIntervalRef.current = setInterval(() => {
         const now = audioContext.currentTime;
@@ -82,7 +70,7 @@ export default function Home() {
         if (now >= nextBarTime) {
           setNextBarTime(now + (secondsPerBeat * beatsPerBar));
         }
-      }, secondsPerBeat * 1000); // Frequent checks to maintain accurate sync
+      }, secondsPerBeat * 1000);
     }
     return () => clearInterval(beatIntervalRef.current);
   }, [audioContext, beatsPerBar, secondsPerBeat]);
@@ -95,67 +83,62 @@ export default function Home() {
     source.connect(audioContext.destination);
     source.loop = true;
 
-    // Start the sound at the specified time
     source.start(startTime);
     sourcesRef.current[sourceKey] = source;
   };
 
-  const toggleTrack = (index, buffers, activeIndex, setActiveIndex, trackKeyPrefix) => {
+  const toggleTrack = (trackType, index) => {
     const currentTime = audioContext.currentTime;
-    const timeToNextBar = nextBarTime - currentTime;
 
-    if (activeIndex === index) {
-      // Stop the currently playing track at the next bar
-      sourcesRef.current[`${trackKeyPrefix}${index}`]?.stop(nextBarTime);
-      sourcesRef.current[`${trackKeyPrefix}${index}`] = null;
-      setActiveIndex(null);
+    if (activeIndices[trackType] === index) {
+      sourcesRef.current[`${trackType}${index}`]?.stop(nextBarTime);
+      sourcesRef.current[`${trackType}${index}`] = null;
+      setActiveIndices(prev => ({ ...prev, [trackType]: null }));
     } else {
-      // Stop any currently playing track at the next bar
-      if (activeIndex !== null) {
-        sourcesRef.current[`${trackKeyPrefix}${activeIndex}`]?.stop(nextBarTime);
-        sourcesRef.current[`${trackKeyPrefix}${activeIndex}`] = null;
+      if (activeIndices[trackType] !== null) {
+        sourcesRef.current[`${trackType}${activeIndices[trackType]}`]?.stop(nextBarTime);
+        sourcesRef.current[`${trackType}${activeIndices[trackType]}`] = null;
       }
 
-      // Schedule the new track to start at the next bar
-      playSound(buffers[index], `${trackKeyPrefix}${index}`, nextBarTime);
-      setActiveIndex(index);
+      playSound(buffers[trackType][index], `${trackType}${index}`, nextBarTime);
+      setActiveIndices(prev => ({ ...prev, [trackType]: index }));
     }
   };
 
   return (
     <>
-    <Header />
-    <div className="flex flex-col items-center justify-center min-h-screen">
-      <TrackGroup
-        trackNames={scene.nutmeg.tracks}
-        imagePrefix={scene.nutmeg.imagePrefix}
-        buffers={nutmegBuffers}
-        activeIndex={activeNutmegIndex}
-        toggleTrack={(index) => toggleTrack(index, nutmegBuffers, activeNutmegIndex, setActiveNutmegIndex, 'nutmeg')}
-      />
-      <TrackGroup
-        trackNames={scene.piano.tracks}
-        imagePrefix={scene.piano.imagePrefix}
-        buffers={pianoBuffers}
-        activeIndex={activePianoIndex}
-        toggleTrack={(index) => toggleTrack(index, pianoBuffers, activePianoIndex, setActivePianoIndex, 'piano')}
-      />
-      <TrackGroup
-        trackNames={scene.viola.tracks}
-        imagePrefix={scene.viola.imagePrefix}
-        buffers={violaBuffers}
-        activeIndex={activeViolaIndex}
-        toggleTrack={(index) => toggleTrack(index, violaBuffers, activeViolaIndex, setActiveViolaIndex, 'viola')}
-      />
-      <TrackGroup
-        trackNames={scene.reese.tracks}
-        imagePrefix={scene.reese.imagePrefix}
-        buffers={reeseBuffers}
-        activeIndex={activeReeseIndex}
-        toggleTrack={(index) => toggleTrack(index, reeseBuffers, activeReeseIndex, setActiveReeseIndex, 'reese')}
-      />
-    </div>
-    <Footer />
+      <Header />
+      <div className="flex flex-col items-center justify-center min-h-screen">
+        <div className="flex space-x-4 mb-4">
+          {sceneKeys.map((sceneKey, index) => (
+            <Button
+              variant="ghost"
+              key={index}
+              className={`${index === selectedSceneIndex ? 'bg-gray-400' : 'bg-transparent'}`} // Gray background when selected
+              onClick={() => setSelectedSceneIndex(index)}
+            >
+              <img 
+                src={`/img/scene${index + 1}.png`} 
+                alt={`Scene ${index + 1}`} 
+                className="h-12 w-12 object-contain"
+              />
+            </Button>
+          ))}
+        </div>
+        {Object.entries(scene).map(([trackType, trackData]) => (
+          trackData.tracks && (
+            <TrackGroup
+              key={trackType}
+              trackNames={trackData.tracks}
+              imagePrefix={trackData.imagePrefix}
+              buffers={buffers[trackType]}
+              activeIndex={activeIndices[trackType]}
+              toggleTrack={(index) => toggleTrack(trackType, index)}
+            />
+          )
+        ))}
+      </div>
+      <Footer />
     </>
   );
 }
