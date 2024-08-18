@@ -7,7 +7,6 @@ import TrackGroup from "@/components/TrackGroup";
 import { trackConfigs } from "@/config/trackConfig";
 import { Button } from "@/components/ui/button";
 
-
 const loadBuffers = async (audioContext, tracks) => {
   const buffers = await Promise.all(
     tracks.map(track => 
@@ -51,29 +50,34 @@ export default function Home() {
     };
 
     loadSceneBuffers();
-
-    return () => {
-      clearInterval(beatIntervalRef.current);
-      Object.values(sourcesRef.current).forEach(source => source && source.stop());
-    };
   }, [scene]);
 
-  const { bpm, beatsPerBar, secondsPerBeat } = scene;
-
-  // Sync the metronome with the audio context's current time
   useEffect(() => {
-    if (audioContext && !beatIntervalRef.current) {
-      setNextBarTime(audioContext.currentTime + (secondsPerBeat * beatsPerBar));
-      beatIntervalRef.current = setInterval(() => {
-        const now = audioContext.currentTime;
-        setBeat(prevBeat => (prevBeat + 1) % beatsPerBar);
-        if (now >= nextBarTime) {
-          setNextBarTime(now + (secondsPerBeat * beatsPerBar));
-        }
-      }, secondsPerBeat * 1000);
+    if (audioContext) {
+      // Clear any existing intervals
+      if (beatIntervalRef.current) {
+        clearInterval(beatIntervalRef.current);
+      }
+
+      // Initialize nextBarTime and start the metronome
+      const initializeMetronome = () => {
+        setNextBarTime(audioContext.currentTime + (scene.secondsPerBeat * scene.beatsPerBar));
+        beatIntervalRef.current = setInterval(() => {
+          const now = audioContext.currentTime;
+          setBeat(prevBeat => (prevBeat + 1) % scene.beatsPerBar);
+          if (now >= nextBarTime) {
+            setNextBarTime(now + (scene.secondsPerBeat * scene.beatsPerBar));
+          }
+        }, scene.secondsPerBeat * 1000);
+      };
+
+      initializeMetronome();
+
+      return () => {
+        clearInterval(beatIntervalRef.current);
+      };
     }
-    return () => clearInterval(beatIntervalRef.current);
-  }, [audioContext, beatsPerBar, secondsPerBeat]);
+  }, [audioContext, scene, nextBarTime]);
 
   const playSound = (buffer, sourceKey, startTime) => {
     if (!buffer) return;
@@ -85,6 +89,17 @@ export default function Home() {
 
     source.start(startTime);
     sourcesRef.current[sourceKey] = source;
+  };
+
+  const stopAllTracks = () => {
+    Object.keys(sourcesRef.current).forEach(sourceKey => {
+      const source = sourcesRef.current[sourceKey];
+      if (source) {
+        source.stop();
+        sourcesRef.current[sourceKey] = null;
+      }
+    });
+    setActiveIndices({});
   };
 
   const toggleTrack = (trackType, index) => {
@@ -105,38 +120,45 @@ export default function Home() {
     }
   };
 
+  const handleSceneChange = (index) => {
+    stopAllTracks(); // Stop all tracks before switching scenes
+    setSelectedSceneIndex(index);
+  };
+
   return (
     <>
       <Header />
       <div className="flex flex-col items-center justify-center min-h-screen">
-        <div className="flex space-x-4 mb-4">
+        <div className="flex space-x-12 mb-32">
           {sceneKeys.map((sceneKey, index) => (
             <Button
               variant="ghost"
               key={index}
-              className={`${index === selectedSceneIndex ? 'bg-gray-400' : 'bg-transparent'}`} // Gray background when selected
-              onClick={() => setSelectedSceneIndex(index)}
+              className={`${index === selectedSceneIndex ? 'bg-gray-400 p-0' : 'bg-transparent p-0'}`} // Gray background when selected
+              onClick={() => handleSceneChange(index)}
             >
               <img 
                 src={`/img/scene${index + 1}.png`} 
                 alt={`Scene ${index + 1}`} 
-                className="h-12 w-12 object-contain"
+                className="h-8 w-8 object-contain"
               />
             </Button>
           ))}
         </div>
-        {Object.entries(scene).map(([trackType, trackData]) => (
-          trackData.tracks && (
-            <TrackGroup
-              key={trackType}
-              trackNames={trackData.tracks}
-              imagePrefix={trackData.imagePrefix}
-              buffers={buffers[trackType]}
-              activeIndex={activeIndices[trackType]}
-              toggleTrack={(index) => toggleTrack(trackType, index)}
-            />
-          )
-        ))}
+        <div className="justify-center space-y-6">
+          {Object.entries(scene).map(([trackType, trackData]) => (
+            trackData.tracks && (
+              <TrackGroup
+                key={trackType}
+                trackNames={trackData.tracks}
+                imagePrefix={trackData.imagePrefix}
+                buffers={buffers[trackType]}
+                activeIndex={activeIndices[trackType]}
+                toggleTrack={(index) => toggleTrack(trackType, index)}
+              />
+            )
+          ))}
+        </div>
       </div>
       <Footer />
     </>
