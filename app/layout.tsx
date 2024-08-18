@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Roboto_Mono, Sixtyfour } from "next/font/google";
 import "./globals.css";
+import { Analytics } from "@vercel/analytics/react"
 
 const roboto = Sixtyfour({ subsets: ["latin"] });
 
@@ -16,6 +17,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
+      <Analytics />
       <body className={roboto.className}>{children}</body>
     </html>
   );
