@@ -34,6 +34,11 @@ export const trackConfigs = {
       ],
       imagePrefix: '/img/instr_4_',
     },
+    featuredArtist: {
+      name: "CO.GA",
+      spotifyLink: "https://open.spotify.com/artist/5MUjMywaSDPTVm82XIlCQS?si=ceb4bf6b77394716"
+    },
+    backgroundColor: 'hsl(256, 46.15%, 25.49%)',
     bpm: 80, // Beats per minute
     beatsPerBar: 4,
     get secondsPerBeat() {
@@ -75,6 +80,11 @@ export const trackConfigs = {
       ],
       imagePrefix: '/img/instr_4_',
     },
+    featuredArtist: {
+      name: "CO.GA",
+      spotifyLink: "https://open.spotify.com/artist/5MUjMywaSDPTVm82XIlCQS?si=ceb4bf6b77394716"
+    },
+    backgroundColor: 'hsl(144, 21%, 27%)',
     bpm: 80, // Beats per minute
     beatsPerBar: 4,
     get secondsPerBeat() {

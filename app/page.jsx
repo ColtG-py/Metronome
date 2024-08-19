@@ -8,6 +8,8 @@ import { trackConfigs } from "@/config/trackConfig";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider"; // Assuming you have a Slider component
 import { TypeAnimation } from "react-type-animation";
+import { FaSpotify } from 'react-icons/fa'; // Import Spotify icon
+
 
 const loadBuffers = async (audioContext, tracks) => {
   const buffers = await Promise.all(
@@ -37,89 +39,147 @@ export default function Home() {
   const sourcesRef = useRef({});
 
   const [audioContextInitialized, setAudioContextInitialized] = useState(false);
+  const [reverbGain, setReverbGain] = useState(null); // State to hold the reverb gain node
 
+  const createImpulseResponse = (context, duration, decay) => {
+    const rate = context.sampleRate;
+    const length = rate * duration;
+    const impulse = context.createBuffer(2, length, rate);
+    const impulseL = impulse.getChannelData(0);
+    const impulseR = impulse.getChannelData(1);
+  
+    for (let i = 0; i < length; i++) {
+      const n = decay ? Math.pow(1 - i / length, decay) : 1;
+      impulseL[i] = (Math.random() * 2 - 1) * n;
+      impulseR[i] = (Math.random() * 2 - 1) * n;
+    }
+  
+    return impulse;
+  };
+  
   const initializeAudioContext = () => {
     if (!audioContextInitialized) {
+      console.log("initializing audio context...");
       const context = new (window.AudioContext || window.webkitAudioContext)();
       const gainNode = context.createGain();
-      const filterNode = context.createBiquadFilter(); // Create the filter node
-      filterNode.type = 'lowpass'; // Set to low-pass filter
-      filterNode.frequency.value = 1000; // Default cutoff frequency
-
-      gainNode.connect(filterNode); // Connect gain node to filter node
-      filterNode.connect(context.destination); // Connect filter node to destination
-
+      const filterNode = context.createBiquadFilter();
+      filterNode.type = 'lowpass';
+      filterNode.frequency.value = 1000;
+  
+      const convolverNode = context.createConvolver();
+      const reverbGainNode = context.createGain();
+      const dryGainNode = context.createGain();
+  
+      const impulseResponse = createImpulseResponse(context, 2, 2.0); // 2 seconds duration, decay of 2.0
+      convolverNode.buffer = impulseResponse;
+  
+      gainNode.connect(filterNode);
+      filterNode.connect(dryGainNode);
+      filterNode.connect(convolverNode);
+      convolverNode.connect(reverbGainNode);
+  
+      dryGainNode.connect(context.destination);
+      reverbGainNode.connect(context.destination);
+  
       setAudioContext(context);
       setGainNode(gainNode);
       setFilterNode(filterNode);
-      setAudioContextInitialized(true); // Mark context as initialized
-
-      // Load the buffers only after the context is initialized
+      setReverbGain(reverbGainNode);
+  
       const loadSceneBuffers = async () => {
         const loadedBuffers = {};
-
+  
         for (const [trackType, trackData] of Object.entries(scene)) {
           if (trackData.tracks) {
             loadedBuffers[trackType] = await loadBuffers(context, trackData.tracks);
           }
         }
-
+  
         setBuffers(loadedBuffers);
-        setActiveIndices({}); // Reset active indices when the scene changes
+        setActiveIndices({});
       };
-
+  
       loadSceneBuffers();
     }
+    setAudioContextInitialized(true);
   };
-
-
+  
+  
+  
+  const handleReverbChange = (value) => {
+    if (reverbGain) {
+      reverbGain.gain.value = (value / 100) * 4; // Adjust the gain of the reverb effect
+    }
+  };
+  
   useEffect(() => {
-    const context = new (window.AudioContext || window.webkitAudioContext)();
-    const gainNode = context.createGain();
-    const filterNode = context.createBiquadFilter(); // Create the filter node
-    filterNode.type = 'lowpass'; // Set to low-pass filter
-    filterNode.frequency.value = 1000; // Default cutoff frequency
+    if (!audioContextInitialized) {
+      // Initialize the audio context and nodes
+      const context = new (window.AudioContext || window.webkitAudioContext)();
+      const gainNode = context.createGain();
+      const filterNode = context.createBiquadFilter();
+      filterNode.type = 'lowpass';
+      filterNode.frequency.value = 1000;
   
-    gainNode.connect(filterNode); // Connect gain node to filter node
-    filterNode.connect(context.destination); // Connect filter node to destination
+      const convolverNode = context.createConvolver();
+      const reverbGainNode = context.createGain();
+      const dryGainNode = context.createGain();
   
-    setAudioContext(context);
-    setGainNode(gainNode);
-    setFilterNode(filterNode);
+      const impulseResponse = createImpulseResponse(context, 2, 2.0); // 2 seconds duration, decay of 2.0
+      convolverNode.buffer = impulseResponse;
   
-    const loadSceneBuffers = async () => {
-      const loadedBuffers = {};
+      // Connect the nodes
+      gainNode.connect(filterNode);
+      filterNode.connect(dryGainNode);
+      filterNode.connect(convolverNode);
+      convolverNode.connect(reverbGainNode);
   
-      for (const [trackType, trackData] of Object.entries(scene)) {
-        if (trackData.tracks) {
-          loadedBuffers[trackType] = await loadBuffers(context, trackData.tracks);
-        }
-      }
+      dryGainNode.connect(context.destination);
+      reverbGainNode.connect(context.destination);
   
-      setBuffers(loadedBuffers);
-      setActiveIndices({}); // Reset active indices when the scene changes
-    };
+      // Set the nodes and context to state
+      setAudioContext(context);
+      setGainNode(gainNode);
+      setFilterNode(filterNode);
+      setReverbGain(reverbGainNode);
+      setAudioContextInitialized(true);
   
-    loadSceneBuffers();
+      // Load the scene buffers
+      const loadSceneBuffers = async () => {
+        const loadedBuffers = {};
   
-    return () => {
-      clearInterval(beatIntervalRef.current);
-  
-      Object.values(sourcesRef.current).forEach(source => {
-        if (source && typeof source.stop === 'function') {
-          try {
-            source.stop();
-          } catch (e) {
-            console.warn(`Failed to stop source: ${e.message}`);
+        for (const [trackType, trackData] of Object.entries(scene)) {
+          if (trackData.tracks) {
+            loadedBuffers[trackType] = await loadBuffers(context, trackData.tracks);
           }
         }
-      });
-    };
-  }, [scene]);
+  
+        setBuffers(loadedBuffers);
+        setActiveIndices({});
+      };
+  
+      loadSceneBuffers();
+  
+      return () => {
+        clearInterval(beatIntervalRef.current);
+        Object.values(sourcesRef.current).forEach(source => {
+          if (source && typeof source.stop === 'function') {
+            try {
+              source.stop();
+            } catch (e) {
+              console.warn(`Failed to stop source: ${e.message}`);
+            }
+          }
+        });
+      };
+    }
+  }, [scene, audioContextInitialized]);
+  
   
 
   useEffect(() => {
     if (audioContext) {
+      document.body.style.backgroundColor = scene.backgroundColor;
       // Clear any existing intervals
       if (beatIntervalRef.current) {
         clearInterval(beatIntervalRef.current);
@@ -221,9 +281,17 @@ export default function Home() {
 
   const handleSceneChange = (index) => {
     stopAllTracks(); // Stop all tracks before switching scenes
+  
+    // Reset the audio context and reinitialize the nodes
+    if (audioContext) {
+      audioContext.close(); // Close the old audio context
+      setAudioContextInitialized(false); // Mark the context as uninitialized
+    }
+  
+    // Set the new selected scene
     setSelectedSceneIndex(index);
   };
-
+  
   const handleVolumeChange = (value) => {
     if (gainNode) {
       gainNode.gain.value = value / 100; // Set the gain node's value based on the slider's position
@@ -256,7 +324,7 @@ export default function Home() {
       </div>
     ) : (
       <div className="flex flex-col items-center justify-center min-h-screen">
-        <p className="text-white">scene select</p>
+        <p className="text-white">band select</p>
         <div className="flex space-x-12 mb-16 mt-4">
           {sceneKeys.map((sceneKey, index) => (
             <Button
@@ -273,6 +341,7 @@ export default function Home() {
             </Button>
           ))}
         </div>
+
         <div className="justify-center space-y-6">
           {Object.entries(scene).map(([trackType, trackData], rowIndex) => (
             trackData.tracks && (
@@ -290,12 +359,29 @@ export default function Home() {
         </div>
         <div className="w-1/4 mt-8">
           <p className="text-white">vol.</p>
-          <Slider defaultValue={[50]} max={100} step={1} onValueChange={handleVolumeChange} />
+          <Slider defaultValue={[80]} max={100} step={1} onValueChange={handleVolumeChange} />
         </div>
         <div className="w-1/4 mt-4">
         <p className="text-white">fil.</p>
           <Slider defaultValue={[1000]} max={5000} step={10} onValueChange={handleFilterChange} />
         </div>
+        <div className="w-1/4 mt-4">
+          <p className="text-white">rev.</p>
+          <Slider defaultValue={[10]} max={100} step={1} onValueChange={handleReverbChange} />
+        </div>
+        {scene.featuredArtist && (
+          <div className="mt-8 mb-8 flex items-center text-white">
+            <a 
+              href={scene.featuredArtist.spotifyLink} 
+              target="_blank" 
+              rel="noopener noreferrer"
+              className="flex items-center space-x-2 hover:underline"
+            >
+              <FaSpotify size={24} /> {/* Spotify icon */}
+              <span>{scene.featuredArtist.name}</span>
+            </a>
+          </div>
+        )}
       </div>
     )}
       <Footer />
