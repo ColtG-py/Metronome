@@ -7,6 +7,7 @@ import TrackGroup from "@/components/TrackGroup";
 import { trackConfigs } from "@/config/trackConfig";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider"; // Assuming you have a Slider component
+import { TypeAnimation } from "react-type-animation";
 
 const loadBuffers = async (audioContext, tracks) => {
   const buffers = await Promise.all(
@@ -34,6 +35,43 @@ export default function Home() {
 
   const beatIntervalRef = useRef();
   const sourcesRef = useRef({});
+
+  const [audioContextInitialized, setAudioContextInitialized] = useState(false);
+
+  const initializeAudioContext = () => {
+    if (!audioContextInitialized) {
+      const context = new (window.AudioContext || window.webkitAudioContext)();
+      const gainNode = context.createGain();
+      const filterNode = context.createBiquadFilter(); // Create the filter node
+      filterNode.type = 'lowpass'; // Set to low-pass filter
+      filterNode.frequency.value = 1000; // Default cutoff frequency
+
+      gainNode.connect(filterNode); // Connect gain node to filter node
+      filterNode.connect(context.destination); // Connect filter node to destination
+
+      setAudioContext(context);
+      setGainNode(gainNode);
+      setFilterNode(filterNode);
+      setAudioContextInitialized(true); // Mark context as initialized
+
+      // Load the buffers only after the context is initialized
+      const loadSceneBuffers = async () => {
+        const loadedBuffers = {};
+
+        for (const [trackType, trackData] of Object.entries(scene)) {
+          if (trackData.tracks) {
+            loadedBuffers[trackType] = await loadBuffers(context, trackData.tracks);
+          }
+        }
+
+        setBuffers(loadedBuffers);
+        setActiveIndices({}); // Reset active indices when the scene changes
+      };
+
+      loadSceneBuffers();
+    }
+  };
+
 
   useEffect(() => {
     const context = new (window.AudioContext || window.webkitAudioContext)();
@@ -202,24 +240,25 @@ export default function Home() {
     <>
       <Header />
       <div className="flex flex-col items-center justify-center min-h-screen">
-        <div className="flex space-x-12 mb-16">
+        <p className="text-white">scene select</p>
+        <div className="flex space-x-12 mb-16 mt-4">
           {sceneKeys.map((sceneKey, index) => (
             <Button
               variant="ghost"
               key={index}
-              className={`${index === selectedSceneIndex ? 'bg-gray-400 p-0' : 'bg-transparent p-0'}`} // Gray background when selected
+              className={`${index === selectedSceneIndex ? 'bg-gray-400 p-0' : 'bg-transparent p-0'}`}
               onClick={() => handleSceneChange(index)}
             >
               <img 
                 src={`/img/scene${index + 1}.png`} 
                 alt={`Scene ${index + 1}`} 
-                className="h-12 w-12 object-contain"
+                className="h-8 w-8 object-contain"
               />
             </Button>
           ))}
         </div>
         <div className="justify-center space-y-6">
-          {Object.entries(scene).map(([trackType, trackData]) => (
+          {Object.entries(scene).map(([trackType, trackData], rowIndex) => (
             trackData.tracks && (
               <TrackGroup
                 key={trackType}
@@ -228,18 +267,22 @@ export default function Home() {
                 buffers={buffers[trackType]}
                 activeIndex={activeIndices[trackType]}
                 toggleTrack={(index) => toggleTrack(trackType, index)}
+                rowIndex={rowIndex + 1}  // Pass the global row index here (1-based)
               />
             )
           ))}
         </div>
-        <div className="w-1/2 mt-8">
+        <div className="w-1/4 mt-8">
+          <p className="text-white">vol.</p>
           <Slider defaultValue={[50]} max={100} step={1} onValueChange={handleVolumeChange} />
         </div>
-        <div className="w-1/2 mt-4">
-          <Slider defaultValue={[1000]} max={5000} step={10} onValueChange={handleFilterChange} /> {/* Low-pass filter */}
+        <div className="w-1/4 mt-4">
+        <p className="text-white">fil.</p>
+          <Slider defaultValue={[1000]} max={5000} step={10} onValueChange={handleFilterChange} />
         </div>
       </div>
       <Footer />
     </>
   );
 }
+  
