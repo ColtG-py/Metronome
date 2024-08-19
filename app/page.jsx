@@ -367,15 +367,15 @@ export default function Home() {
         </div>
         <div className="w-1/4 mt-8">
           <p className="text-white">vol.</p>
-          <Slider defaultValue={[80]} max={100} step={1} onValueChange={handleVolumeChange} />
+          <Slider defaultValue={[40]} max={100} step={1} onValueChange={handleVolumeChange} />
         </div>
         <div className="w-1/4 mt-4">
         <p className="text-white">fil.</p>
-          <Slider defaultValue={[1000]} max={5000} step={10} onValueChange={handleFilterChange} />
+          <Slider defaultValue={[2500]} max={5000} step={10} onValueChange={handleFilterChange} />
         </div>
         <div className="w-1/4 mt-4">
           <p className="text-white">rev.</p>
-          <Slider defaultValue={[10]} max={100} step={1} onValueChange={handleReverbChange} />
+          <Slider defaultValue={[15]} max={100} step={1} onValueChange={handleReverbChange} />
         </div>
         {scene.featuredArtist && (
           <div className="mt-8 mb-8 flex items-center text-white">
