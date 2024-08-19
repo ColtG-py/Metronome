@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider"; // Assuming you have a Slider component
 import { TypeAnimation } from "react-type-animation";
 import { FaSpotify } from 'react-icons/fa'; // Import Spotify icon
-
+import Snowfall from 'react-snowfall'
 
 const loadBuffers = async (audioContext, tracks) => {
   const buffers = await Promise.all(
@@ -34,6 +34,7 @@ export default function Home() {
   const [activeIndices, setActiveIndices] = useState({});
   const [nextBarTime, setNextBarTime] = useState(0);
   const [beat, setBeat] = useState(0);
+  const [volume, setVolume] = useState(80); // State to track the volume
 
   const beatIntervalRef = useRef();
   const sourcesRef = useRef({});
@@ -293,6 +294,7 @@ export default function Home() {
   };
   
   const handleVolumeChange = (value) => {
+    setVolume(value); // Update the volume state
     if (gainNode) {
       gainNode.gain.value = value / 100; // Set the gain node's value based on the slider's position
     }
@@ -306,6 +308,12 @@ export default function Home() {
 
   return (
     <>
+      <Snowfall
+        // Changes the snowflake color
+        color="red"
+        // Controls the number of snowflakes that are created based on volume (max 200)
+        snowflakeCount={Math.floor((volume / 100) * 200)}
+      />
       <Header />
       {!audioContextInitialized ? (
       <div className="flex flex-col items-center justify-center min-h-screen">
@@ -388,4 +396,3 @@ export default function Home() {
     </>
   );
 }
-  
