@@ -242,7 +242,16 @@ export default function Home() {
       {!audioContextInitialized ? (
       <div className="flex flex-col items-center justify-center min-h-screen">
         <Button onClick={initializeAudioContext} className="p-4 bg-blue-500 text-white rounded">
-          Tap to Start Audio
+          <TypeAnimation 
+              sequence={[
+                  "tap to start",
+                  3000,
+                  "tap to create",
+                  3000,
+                  "tap to play"
+              ]}
+              repeat={0}
+          />
         </Button>
       </div>
     ) : (
