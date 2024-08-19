@@ -6,7 +6,7 @@ export default function Footer() {
   return (
     <footer className="fixed bottom-0 w-full py-4 flex justify-between text-white px-8">
       <div className="flex space-x-8"> {/* Container for the first two icons */}
-        <a href="https://github.com/ColtG-py" target="_blank" rel="noopener noreferrer">
+        <a href="https://github.com/ColtG-py/Metronome" target="_blank" rel="noopener noreferrer">
           <FaGithub size={36} /> {/* Adjusted size to 36px */}
         </a>
         <a href="https://explained.engineering" target="_blank" rel="noopener noreferrer">
