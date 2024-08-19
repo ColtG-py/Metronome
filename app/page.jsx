@@ -239,6 +239,13 @@ export default function Home() {
   return (
     <>
       <Header />
+      {!audioContextInitialized ? (
+      <div className="flex flex-col items-center justify-center min-h-screen">
+        <Button onClick={initializeAudioContext} className="p-4 bg-blue-500 text-white rounded">
+          Tap to Start Audio
+        </Button>
+      </div>
+    ) : (
       <div className="flex flex-col items-center justify-center min-h-screen">
         <p className="text-white">scene select</p>
         <div className="flex space-x-12 mb-16 mt-4">
@@ -281,6 +288,7 @@ export default function Home() {
           <Slider defaultValue={[1000]} max={5000} step={10} onValueChange={handleFilterChange} />
         </div>
       </div>
+    )}
       <Footer />
     </>
   );
