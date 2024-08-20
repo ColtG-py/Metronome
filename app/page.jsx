@@ -6,10 +6,10 @@ import Header from "@/components/Header";
 import TrackGroup from "@/components/TrackGroup";
 import { trackConfigs } from "@/config/trackConfig";
 import { Button } from "@/components/ui/button";
-import { Slider } from "@/components/ui/slider"; // Assuming you have a Slider component
+import { Slider } from "@/components/ui/slider";
 import { TypeAnimation } from "react-type-animation";
-import { FaSpotify } from 'react-icons/fa'; // Import Spotify icon
-import Snowfall from 'react-snowfall'
+import { FaSpotify } from 'react-icons/fa';
+import Snowfall from 'react-snowfall';
 
 const loadBuffers = async (audioContext, tracks) => {
   const buffers = await Promise.all(
@@ -23,24 +23,24 @@ const loadBuffers = async (audioContext, tracks) => {
 };
 
 export default function Home() {
-  const [selectedSceneIndex, setSelectedSceneIndex] = useState(0); // State to track selected scene
-  const sceneKeys = Object.keys(trackConfigs); // Get scene keys dynamically
-  const scene = trackConfigs[sceneKeys[selectedSceneIndex]]; // Select the current scene based on the index
+  const [selectedSceneIndex, setSelectedSceneIndex] = useState(0);
+  const sceneKeys = Object.keys(trackConfigs);
+  const scene = trackConfigs[sceneKeys[selectedSceneIndex]];
 
   const [audioContext, setAudioContext] = useState(null);
-  const [gainNode, setGainNode] = useState(null); // State to hold the gain node
-  const [filterNode, setFilterNode] = useState(null); // State to hold the filter node
+  const [gainNode, setGainNode] = useState(null);
+  const [filterNode, setFilterNode] = useState(null);
   const [buffers, setBuffers] = useState({});
   const [activeIndices, setActiveIndices] = useState({});
   const [nextBarTime, setNextBarTime] = useState(0);
   const [beat, setBeat] = useState(0);
-  const [volume, setVolume] = useState(80); // State to track the volume
+  const [volume, setVolume] = useState(80);
 
-  const beatIntervalRef = useRef();
   const sourcesRef = useRef({});
+  const animationFrameRef = useRef(null); // Ref for managing requestAnimationFrame
 
   const [audioContextInitialized, setAudioContextInitialized] = useState(false);
-  const [reverbGain, setReverbGain] = useState(null); // State to hold the reverb gain node
+  const [reverbGain, setReverbGain] = useState(null);
 
   const createImpulseResponse = (context, duration, decay) => {
     const rate = context.sampleRate;
@@ -71,7 +71,7 @@ export default function Home() {
       const reverbGainNode = context.createGain();
       const dryGainNode = context.createGain();
   
-      const impulseResponse = createImpulseResponse(context, 2, 2.0); // 2 seconds duration, decay of 2.0
+      const impulseResponse = createImpulseResponse(context, 2, 2.0);
       convolverNode.buffer = impulseResponse;
   
       gainNode.connect(filterNode);
@@ -105,17 +105,14 @@ export default function Home() {
     setAudioContextInitialized(true);
   };
   
-  
-  
   const handleReverbChange = (value) => {
     if (reverbGain) {
-      reverbGain.gain.value = (value / 100) * 4; // Adjust the gain of the reverb effect
+      reverbGain.gain.value = (value / 100) * 4;
     }
   };
-  
+
   useEffect(() => {
     if (!audioContextInitialized) {
-      // Initialize the audio context and nodes
       const context = new (window.AudioContext || window.webkitAudioContext)();
       const gainNode = context.createGain();
       const filterNode = context.createBiquadFilter();
@@ -126,10 +123,9 @@ export default function Home() {
       const reverbGainNode = context.createGain();
       const dryGainNode = context.createGain();
   
-      const impulseResponse = createImpulseResponse(context, 2, 2.0); // 2 seconds duration, decay of 2.0
+      const impulseResponse = createImpulseResponse(context, 2, 2.0);
       convolverNode.buffer = impulseResponse;
   
-      // Connect the nodes
       gainNode.connect(filterNode);
       filterNode.connect(dryGainNode);
       filterNode.connect(convolverNode);
@@ -138,14 +134,12 @@ export default function Home() {
       dryGainNode.connect(context.destination);
       reverbGainNode.connect(context.destination);
   
-      // Set the nodes and context to state
       setAudioContext(context);
       setGainNode(gainNode);
       setFilterNode(filterNode);
       setReverbGain(reverbGainNode);
       setAudioContextInitialized(true);
   
-      // Load the scene buffers
       const loadSceneBuffers = async () => {
         const loadedBuffers = {};
   
@@ -162,7 +156,7 @@ export default function Home() {
       loadSceneBuffers();
   
       return () => {
-        clearInterval(beatIntervalRef.current);
+        cancelAnimationFrame(animationFrameRef.current);
         Object.values(sourcesRef.current).forEach(source => {
           if (source && typeof source.stop === 'function') {
             try {
@@ -175,33 +169,26 @@ export default function Home() {
       };
     }
   }, [scene, audioContextInitialized]);
-  
-  
 
   useEffect(() => {
     if (audioContext) {
       document.body.style.backgroundColor = scene.backgroundColor;
-      // Clear any existing intervals
-      if (beatIntervalRef.current) {
-        clearInterval(beatIntervalRef.current);
-      }
 
-      // Initialize nextBarTime and start the metronome
-      const initializeMetronome = () => {
-        setNextBarTime(audioContext.currentTime + (scene.secondsPerBeat * scene.beatsPerBar));
-        beatIntervalRef.current = setInterval(() => {
-          const now = audioContext.currentTime;
+      const metronome = () => {
+        const now = audioContext.currentTime;
+        if (now >= nextBarTime) {
+          setNextBarTime(now + (scene.secondsPerBeat * scene.beatsPerBar));
           setBeat(prevBeat => (prevBeat + 1) % scene.beatsPerBar);
-          if (now >= nextBarTime) {
-            setNextBarTime(now + (scene.secondsPerBeat * scene.beatsPerBar));
-          }
-        }, scene.secondsPerBeat * 1000);
+          console.log(`Next bar time updated to: ${nextBarTime}`);
+        }
+        animationFrameRef.current = requestAnimationFrame(metronome);
       };
 
-      initializeMetronome();
+      setNextBarTime(audioContext.currentTime + (scene.secondsPerBeat * scene.beatsPerBar));
+      animationFrameRef.current = requestAnimationFrame(metronome);
 
       return () => {
-        clearInterval(beatIntervalRef.current);
+        cancelAnimationFrame(animationFrameRef.current);
       };
     }
   }, [audioContext, scene, nextBarTime]);
@@ -212,20 +199,18 @@ export default function Home() {
     const source = audioContext.createBufferSource();
     source.buffer = buffer;
     const gain = audioContext.createGain();
-    gain.gain.setValueAtTime(0, startTime); // Ensure the track starts with volume at 0
-    gain.gain.linearRampToValueAtTime(1, startTime + fadeTime); // Smoothly ramp up the volume
+    gain.gain.setValueAtTime(0, startTime);
+    gain.gain.linearRampToValueAtTime(1, startTime + fadeTime);
     source.connect(gain);
-    gain.connect(gainNode); // Connect to global gain control
+    gain.connect(gainNode);
     source.loop = true;
   
-    source.start(startTime); // Start playing at the next bar
+    source.start(startTime);
+    console.log(`Playing sound: ${sourceKey} at time: ${startTime}`);
     sourcesRef.current[sourceKey] = source;
-  
-    // Store gain for possible future fade out
     sourcesRef.current[`${sourceKey}-gain`] = gain;
   };
-  
-  
+
   const stopAllTracks = () => {
     Object.keys(sourcesRef.current).forEach(sourceKey => {
       const source = sourcesRef.current[sourceKey];
@@ -234,9 +219,10 @@ export default function Home() {
           const gain = sourcesRef.current[`${sourceKey}-gain`];
           if (gain) {
             gain.gain.setValueAtTime(gain.gain.value, audioContext.currentTime);
-            gain.gain.linearRampToValueAtTime(0, audioContext.currentTime + 0.05); // Fade out before stopping
+            gain.gain.linearRampToValueAtTime(0, audioContext.currentTime + 0.05);
           }
-          source.stop(audioContext.currentTime + 0.1); // Stop slightly after the fade-out
+          source.stop(audioContext.currentTime + 0.1);
+          console.log(`Stopping sound: ${sourceKey} at time: ${audioContext.currentTime}`);
           sourcesRef.current[sourceKey] = null;
         } catch (e) {
           console.warn(`Failed to stop track ${sourceKey}: ${e.message}`);
@@ -246,152 +232,140 @@ export default function Home() {
     setActiveIndices({});
   };
   
-
   const toggleTrack = (trackType, index) => {
     const currentTime = audioContext.currentTime;
   
     if (activeIndices[trackType] === index) {
-      // If the selected track is already playing, fade it out and stop it at the next bar
       const gain = sourcesRef.current[`${trackType}${index}-gain`];
       if (gain) {
         gain.gain.setValueAtTime(gain.gain.value, currentTime);
-        gain.gain.linearRampToValueAtTime(0, nextBarTime); // Fade out to zero at the next bar
+        gain.gain.linearRampToValueAtTime(0, nextBarTime);
       }
-      sourcesRef.current[`${trackType}${index}`]?.stop(nextBarTime + 0.05); // Stop after fade out completes
+      sourcesRef.current[`${trackType}${index}`]?.stop(nextBarTime + 0.05);
       sourcesRef.current[`${trackType}${index}`] = null;
       setActiveIndices(prev => ({ ...prev, [trackType]: null }));
     } else {
       if (activeIndices[trackType] !== null) {
-        // Fade out the currently playing track at the next bar
         const previousGain = sourcesRef.current[`${trackType}${activeIndices[trackType]}-gain`];
         if (previousGain) {
           previousGain.gain.setValueAtTime(previousGain.gain.value, currentTime);
-          previousGain.gain.linearRampToValueAtTime(0, nextBarTime); // Fade out the old track at the next bar
+          previousGain.gain.linearRampToValueAtTime(0, nextBarTime);
         }
-        sourcesRef.current[`${trackType}${activeIndices[trackType]}`]?.stop(nextBarTime + 0.05); // Stop after fade out
+        sourcesRef.current[`${trackType}${activeIndices[trackType]}`]?.stop(nextBarTime + 0.05);
         sourcesRef.current[`${trackType}${activeIndices[trackType]}`] = null;
       }
   
-      // Ensure the new track starts exactly at the next bar and fades in smoothly
       playSound(buffers[trackType][index], `${trackType}${index}`, nextBarTime);
       setActiveIndices(prev => ({ ...prev, [trackType]: index }));
     }
   };
-  
-  
 
   const handleSceneChange = (index) => {
-    stopAllTracks(); // Stop all tracks before switching scenes
-  
-    // Reset the audio context and reinitialize the nodes
+    stopAllTracks();
     if (audioContext) {
-      audioContext.close(); // Close the old audio context
-      setAudioContextInitialized(false); // Mark the context as uninitialized
+      audioContext.close();
+      setAudioContextInitialized(false);
     }
-  
-    // Set the new selected scene
     setSelectedSceneIndex(index);
   };
-  
+
   const handleVolumeChange = (value) => {
-    setVolume(value); // Update the volume state
+    setVolume(value);
     if (gainNode) {
-      gainNode.gain.value = value / 100; // Set the gain node's value based on the slider's position
+      gainNode.gain.value = value / 100;
     }
   };
 
   const handleFilterChange = (value) => {
     if (filterNode) {
-      filterNode.frequency.value = value; // Set the cutoff frequency for the low-pass filter
+      filterNode.frequency.value = value;
     }
   };
 
   return (
     <>
       <Snowfall
-        // Changes the snowflake color
         color="red"
-        // Controls the number of snowflakes that are created based on volume (max 200)
         snowflakeCount={Math.floor((volume / 100) * 200)}
       />
       <Header />
       {!audioContextInitialized ? (
-      <div className="flex flex-col items-center justify-center min-h-screen">
-        <Button onClick={initializeAudioContext} className="p-4 bg-blue-500 text-white rounded">
-          <TypeAnimation 
-              sequence={[
-                  "tap to start",
-                  3000,
-                  "tap to create",
-                  3000,
-                  "tap to play"
-              ]}
-              repeat={0}
-          />
-        </Button>
-      </div>
-    ) : (
-      <div className="flex flex-col items-center justify-center min-h-screen">
-        <p className="text-white">band select</p>
-        <div className="flex space-x-12 mb-16 mt-4">
-          {sceneKeys.map((sceneKey, index) => (
-            <Button
-              variant="ghost"
-              key={index}
-              className={`${index === selectedSceneIndex ? 'bg-gray-400 p-0' : 'bg-transparent p-0'}`}
-              onClick={() => handleSceneChange(index)}
-            >
-              <img 
-                src={`/img/scene${index + 1}.png`} 
-                alt={`Scene ${index + 1}`} 
-                className="h-8 w-8 object-contain"
-              />
-            </Button>
-          ))}
+        <div className="flex flex-col items-center justify-center min-h-screen">
+          <Button onClick={initializeAudioContext} className="p-4 bg-blue-500 text-white rounded">
+            <TypeAnimation 
+                sequence={[
+                    "tap to start",
+                    3000,
+                    "tap to create",
+                    3000,
+                    "tap to play"
+                ]}
+                repeat={0}
+            />
+          </Button>
         </div>
-
-        <div className="justify-center space-y-6">
-          {Object.entries(scene).map(([trackType, trackData], rowIndex) => (
-            trackData.tracks && (
-              <TrackGroup
-                key={trackType}
-                trackNames={trackData.tracks}
-                imagePrefix={trackData.imagePrefix}
-                buffers={buffers[trackType]}
-                activeIndex={activeIndices[trackType]}
-                toggleTrack={(index) => toggleTrack(trackType, index)}
-                rowIndex={rowIndex + 1}  // Pass the global row index here (1-based)
-              />
-            )
-          ))}
-        </div>
-        <div className="w-1/4 mt-8">
-          <p className="text-white">vol.</p>
-          <Slider defaultValue={[40]} max={100} step={1} onValueChange={handleVolumeChange} />
-        </div>
-        <div className="w-1/4 mt-4">
-        <p className="text-white">fil.</p>
-          <Slider defaultValue={[2500]} max={5000} step={10} onValueChange={handleFilterChange} />
-        </div>
-        <div className="w-1/4 mt-4">
-          <p className="text-white">rev.</p>
-          <Slider defaultValue={[15]} max={100} step={1} onValueChange={handleReverbChange} />
-        </div>
-        {scene.featuredArtist && (
-          <div className="mt-8 mb-8 flex items-center text-white">
-            <a 
-              href={scene.featuredArtist.spotifyLink} 
-              target="_blank" 
-              rel="noopener noreferrer"
-              className="flex items-center space-x-2 hover:underline"
-            >
-              <FaSpotify size={24} /> {/* Spotify icon */}
-              <span>{scene.featuredArtist.name}</span>
-            </a>
+      ) : (
+        <div className="flex flex-col items-center justify-center min-h-screen">
+          <p className="text-white">band select</p>
+          <div className="flex space-x-12 mb-16 mt-4">
+            {sceneKeys.map((sceneKey, index) => (
+              <Button
+                variant="ghost"
+                key={index}
+                className={`${index === selectedSceneIndex ? 'bg-gray-400 p-0' : 'bg-transparent p-0'}`}
+                onClick={() => handleSceneChange(index)}
+              >
+                <img 
+                  src={`/img/scene${index + 1}.png`} 
+                  alt={`Scene ${index + 1}`} 
+                  className="h-8 w-8 object-contain"
+                />
+              </Button>
+            ))}
           </div>
-        )}
-      </div>
-    )}
+
+          <div className="justify-center space-y-6">
+            {Object.entries(scene).map(([trackType, trackData], rowIndex) => (
+              trackData.tracks && (
+                <TrackGroup
+                  key={trackType}
+                  trackNames={trackData.tracks}
+                  imagePrefix={trackData.imagePrefix}
+                  buffers={buffers[trackType]}
+                  activeIndex={activeIndices[trackType]}
+                  toggleTrack={(index) => toggleTrack(trackType, index)}
+                  rowIndex={rowIndex + 1}
+                />
+              )
+            ))}
+          </div>
+          <div className="w-1/4 mt-8">
+            <p className="text-white">vol.</p>
+            <Slider defaultValue={[40]} max={100} step={1} onValueChange={handleVolumeChange} />
+          </div>
+          <div className="w-1/4 mt-4">
+            <p className="text-white">fil.</p>
+            <Slider defaultValue={[2500]} max={5000} step={10} onValueChange={handleFilterChange} />
+          </div>
+          <div className="w-1/4 mt-4">
+            <p className="text-white">rev.</p>
+            <Slider defaultValue={[15]} max={100} step={1} onValueChange={handleReverbChange} />
+          </div>
+          {scene.featuredArtist && (
+            <div className="mt-8 mb-8 flex items-center text-white">
+              <a 
+                href={scene.featuredArtist.spotifyLink} 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="flex items-center space-x-2 hover:underline"
+              >
+                <FaSpotify size={24} />
+                <span>{scene.featuredArtist.name}</span>
+              </a>
+            </div>
+          )}
+        </div>
+      )}
       <Footer />
     </>
   );
