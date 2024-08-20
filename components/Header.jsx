@@ -4,7 +4,7 @@ import { TypeAnimation } from "react-type-animation";
 
 export default function Header() {
     return (
-      <header className="fixed top-0 w-full py-4 flex items-center justify-center text-white text-2xl">
+      <header className="sm:fixed sm:top-0 w-full py-4 flex items-center justify-center text-white text-2xl">
         <TypeAnimation 
             sequence={[
                 "metronome",

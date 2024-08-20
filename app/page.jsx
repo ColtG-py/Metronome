@@ -35,6 +35,7 @@ export default function Home() {
   const [nextBarTime, setNextBarTime] = useState(0);
   const [beat, setBeat] = useState(0);
   const [volume, setVolume] = useState(80);
+  const [playbackRate, setPlaybackRate] = useState(1); // New state for playback speed
 
   const sourcesRef = useRef({});
   const animationFrameRef = useRef(null); // Ref for managing requestAnimationFrame
@@ -177,21 +178,21 @@ export default function Home() {
       const metronome = () => {
         const now = audioContext.currentTime;
         if (now >= nextBarTime) {
-          setNextBarTime(now + (scene.secondsPerBeat * scene.beatsPerBar));
+          setNextBarTime(now + (scene.secondsPerBeat * scene.beatsPerBar) / playbackRate); // Adjust nextBarTime based on playback rate
           setBeat(prevBeat => (prevBeat + 1) % scene.beatsPerBar);
           console.log(`Next bar time updated to: ${nextBarTime}`);
         }
         animationFrameRef.current = requestAnimationFrame(metronome);
       };
 
-      setNextBarTime(audioContext.currentTime + (scene.secondsPerBeat * scene.beatsPerBar));
+      setNextBarTime(audioContext.currentTime + (scene.secondsPerBeat * scene.beatsPerBar) / playbackRate); // Adjust initial nextBarTime based on playback rate
       animationFrameRef.current = requestAnimationFrame(metronome);
 
       return () => {
         cancelAnimationFrame(animationFrameRef.current);
       };
     }
-  }, [audioContext, scene, nextBarTime]);
+  }, [audioContext, scene, nextBarTime, playbackRate]);
 
   const playSound = (buffer, sourceKey, startTime, fadeTime = 0.05) => {
     if (!buffer) return;
@@ -204,6 +205,7 @@ export default function Home() {
     source.connect(gain);
     gain.connect(gainNode);
     source.loop = true;
+    source.playbackRate.setValueAtTime(playbackRate, startTime); // Set playback rate
   
     source.start(startTime);
     console.log(`Playing sound: ${sourceKey} at time: ${startTime}`);
@@ -282,6 +284,23 @@ export default function Home() {
     }
   };
 
+  const handlePlaybackRateChange = (value) => {
+    setPlaybackRate(value);
+    // Update the playback rate of currently playing tracks
+    Object.keys(sourcesRef.current).forEach(sourceKey => {
+      const source = sourcesRef.current[sourceKey];
+      if (source && source.playbackRate) {
+        try {
+          source.playbackRate.setValueAtTime(value, audioContext.currentTime);
+          console.log(`[PlaybackRateChange] Track: ${sourceKey}, New Rate: ${value}`);
+        } catch (error) {
+          console.warn(`Failed to update playback rate for ${sourceKey}: ${error.message}`);
+        }
+      }
+    });
+  };
+  
+
   return (
     <>
       <Snowfall
@@ -306,51 +325,70 @@ export default function Home() {
         </div>
       ) : (
         <div className="flex flex-col items-center justify-center min-h-screen">
-          <p className="text-white">band select</p>
-          <div className="flex space-x-12 mb-16 mt-4">
-            {sceneKeys.map((sceneKey, index) => (
-              <Button
-                variant="ghost"
-                key={index}
-                className={`${index === selectedSceneIndex ? 'bg-gray-400 p-0' : 'bg-transparent p-0'}`}
-                onClick={() => handleSceneChange(index)}
-              >
-                <img 
-                  src={`/img/scene${index + 1}.png`} 
-                  alt={`Scene ${index + 1}`} 
-                  className="h-8 w-8 object-contain"
-                />
-              </Button>
-            ))}
+          <p className="text-white ">band select</p>
+          <div className="flex justify-center mt-4 mb-8">
+            <div className="w-full max-w-screen-md p-4 border-2 border-white rounded-lg bg-red-500 bg-opacity-10">
+              <div className="flex space-x-12">
+                {sceneKeys.map((sceneKey, index) => (
+                  <Button
+                    variant="ghost"
+                    key={index}
+                    className={`${index === selectedSceneIndex ? 'bg-gray-400 p-0' : 'bg-transparent p-0'}`}
+                    onClick={() => handleSceneChange(index)}
+                  >
+                    <img 
+                      src={`/img/scene${index + 1}.png`} 
+                      alt={`Scene ${index + 1}`} 
+                      className="h-8 w-8 object-contain"
+                    />
+                  </Button>
+                ))}
+              </div>
+            </div>
+          </div>
+          <p className="text-white">track select</p>
+          <div className="flex justify-center mt-4">
+            <div className="w-full p-4 border-2 border-white rounded-lg bg-white bg-opacity-10">
+              <div className="justify-center space-y-4">
+                {Object.entries(scene).map(([trackType, trackData], rowIndex) => (
+                  trackData.tracks && (
+                    <TrackGroup
+                      key={trackType}
+                      trackNames={trackData.tracks}
+                      imagePrefix={trackData.imagePrefix}
+                      buffers={buffers[trackType]}
+                      activeIndex={activeIndices[trackType]}
+                      toggleTrack={(index) => toggleTrack(trackType, index)}
+                      rowIndex={rowIndex + 1}
+                    />
+                  )
+                ))}
+              </div>
+            </div>
           </div>
 
-          <div className="justify-center space-y-6">
-            {Object.entries(scene).map(([trackType, trackData], rowIndex) => (
-              trackData.tracks && (
-                <TrackGroup
-                  key={trackType}
-                  trackNames={trackData.tracks}
-                  imagePrefix={trackData.imagePrefix}
-                  buffers={buffers[trackType]}
-                  activeIndex={activeIndices[trackType]}
-                  toggleTrack={(index) => toggleTrack(trackType, index)}
-                  rowIndex={rowIndex + 1}
-                />
-              )
-            ))}
+          <p className="text-white mt-8">f/x</p>
+          <div className="w-11/12 sm:w-1/4 mt-4 p-4 border-2 border-white rounded-lg bg-white bg-opacity-10">
+            <div className="mb-4">
+              <p className="text-white">vol.</p>
+              <Slider defaultValue={[40]} max={100} step={1} onValueChange={handleVolumeChange} />
+            </div>
+            <div className="mb-4">
+              <p className="text-white">fil.</p>
+              <Slider defaultValue={[2500]} max={5000} step={10} onValueChange={handleFilterChange} />
+            </div>
+            <div className="mb-4">
+              <p className="text-white">rev.</p>
+              <Slider defaultValue={[15]} max={100} step={1} onValueChange={handleReverbChange} />
+            </div>
+            <div>
+              <p className="text-white">s/p.</p>
+              <Slider defaultValue={[1]} min={0.5} max={2} step={0.01} onValueChange={handlePlaybackRateChange} />
+            </div>
           </div>
-          <div className="w-1/4 mt-8">
-            <p className="text-white">vol.</p>
-            <Slider defaultValue={[40]} max={100} step={1} onValueChange={handleVolumeChange} />
-          </div>
-          <div className="w-1/4 mt-4">
-            <p className="text-white">fil.</p>
-            <Slider defaultValue={[2500]} max={5000} step={10} onValueChange={handleFilterChange} />
-          </div>
-          <div className="w-1/4 mt-4">
-            <p className="text-white">rev.</p>
-            <Slider defaultValue={[15]} max={100} step={1} onValueChange={handleReverbChange} />
-          </div>
+
+
+
           {scene.featuredArtist && (
             <div className="mt-8 mb-8 flex items-center text-white">
               <a 
