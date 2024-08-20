@@ -299,13 +299,23 @@ export default function Home() {
       }
     });
   };
-  
 
   return (
     <>
       <Snowfall
         color="red"
         snowflakeCount={Math.floor((volume / 100) * 200)}
+        speed={[Math.max(0.1, 0.5 * playbackRate), Math.min(15.0, 3.0 * playbackRate)]}
+        wind={
+          reverbGain 
+            ? [Math.max(-1.5, 0.5 * reverbGain.gain.value), Math.min(15.0, 3.0 * reverbGain.gain.value)] 
+            : [0, 0]  // Default or fallback values if reverbGain is not initialized
+        }
+        radius={
+          filterNode 
+            ? [Math.max(1.0, 0.001 * filterNode.frequency.value), Math.min(1.25, 0.003 * filterNode.frequency.value)] 
+            : [1, 1]  // Default or fallback values if filterNode is not initialized
+        }
       />
       <Header />
       {!audioContextInitialized ? (
