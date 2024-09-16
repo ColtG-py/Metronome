@@ -33,6 +33,7 @@ export default function Home() {
   const [buffers, setBuffers] = useState({});
   const [activeIndices, setActiveIndices] = useState({});
   const [nextBarTime, setNextBarTime] = useState(0);
+  const nextBarTimeRef = useRef(0);
   const [beat, setBeat] = useState(0);
   const [volume, setVolume] = useState(80);
   const [playbackRate, setPlaybackRate] = useState(1); // New state for playback speed
@@ -174,25 +175,23 @@ export default function Home() {
   useEffect(() => {
     if (audioContext) {
       document.body.style.backgroundColor = scene.backgroundColor;
-
+  
+      nextBarTimeRef.current = audioContext.currentTime + (scene.secondsPerBeat * scene.beatsPerBar) / playbackRate;
       const metronome = () => {
         const now = audioContext.currentTime;
-        if (now >= nextBarTime) {
-          setNextBarTime(now + (scene.secondsPerBeat * scene.beatsPerBar) / playbackRate); // Adjust nextBarTime based on playback rate
-          setBeat(prevBeat => (prevBeat + 1) % scene.beatsPerBar);
-          console.log(`Next bar time updated to: ${nextBarTime}`);
+        if (now >= nextBarTimeRef.current) {
+          nextBarTimeRef.current += (scene.secondsPerBeat * scene.beatsPerBar) / playbackRate;
+          console.log(`Next bar time updated to: ${nextBarTimeRef.current}`);
         }
         animationFrameRef.current = requestAnimationFrame(metronome);
       };
-
-      setNextBarTime(audioContext.currentTime + (scene.secondsPerBeat * scene.beatsPerBar) / playbackRate); // Adjust initial nextBarTime based on playback rate
       animationFrameRef.current = requestAnimationFrame(metronome);
-
+  
       return () => {
         cancelAnimationFrame(animationFrameRef.current);
       };
     }
-  }, [audioContext, scene, nextBarTime, playbackRate]);
+  }, [audioContext, scene, playbackRate]);
 
   const playSound = (buffer, sourceKey, startTime, fadeTime = 0.05) => {
     if (!buffer) return;
@@ -241,9 +240,9 @@ export default function Home() {
       const gain = sourcesRef.current[`${trackType}${index}-gain`];
       if (gain) {
         gain.gain.setValueAtTime(gain.gain.value, currentTime);
-        gain.gain.linearRampToValueAtTime(0, nextBarTime);
+        gain.gain.linearRampToValueAtTime(0, nextBarTimeRef.current);
       }
-      sourcesRef.current[`${trackType}${index}`]?.stop(nextBarTime + 0.05);
+      sourcesRef.current[`${trackType}${index}`]?.stop(nextBarTimeRef.current + 0.05);
       sourcesRef.current[`${trackType}${index}`] = null;
       setActiveIndices(prev => ({ ...prev, [trackType]: null }));
     } else {
@@ -251,13 +250,13 @@ export default function Home() {
         const previousGain = sourcesRef.current[`${trackType}${activeIndices[trackType]}-gain`];
         if (previousGain) {
           previousGain.gain.setValueAtTime(previousGain.gain.value, currentTime);
-          previousGain.gain.linearRampToValueAtTime(0, nextBarTime);
+          previousGain.gain.linearRampToValueAtTime(0, nextBarTimeRef.current);
         }
-        sourcesRef.current[`${trackType}${activeIndices[trackType]}`]?.stop(nextBarTime + 0.05);
+        sourcesRef.current[`${trackType}${activeIndices[trackType]}`]?.stop(nextBarTimeRef.current + 0.05);
         sourcesRef.current[`${trackType}${activeIndices[trackType]}`] = null;
       }
   
-      playSound(buffers[trackType][index], `${trackType}${index}`, nextBarTime);
+      playSound(buffers[trackType][index], `${trackType}${index}`, nextBarTimeRef.current);
       setActiveIndices(prev => ({ ...prev, [trackType]: index }));
     }
   };
